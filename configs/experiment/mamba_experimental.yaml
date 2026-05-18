@@ -1,0 +1,18 @@
+# configs/experiment/mamba_experimental.yaml
+# @package _global_
+# Experimental Mamba track — run only after verifying CUDA kernel compatibility.
+
+defaults:
+  - override /model: mamba_unet
+  - override /training: default
+
+fold: 0
+seed: 42
+
+training:
+  max_epochs: 300
+  loss:
+    deep_supervision: false   # MambaUNet does not use deep supervision
+
+wandb:
+  tags: ["mamba", "experimental", "fold${fold}"]

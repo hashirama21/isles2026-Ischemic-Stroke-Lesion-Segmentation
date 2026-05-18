@@ -1,0 +1,20 @@
+# configs/experiment/segresnet_baseline.yaml
+# @package _global_
+# Complete override for the SegResNet + FiLM baseline experiment.
+
+defaults:
+  - override /model: segresnet
+  - override /training: default
+
+fold: 0
+seed: 42
+
+wandb:
+  tags: ["segresnet", "film", "fold${fold}", "baseline"]
+
+training:
+  max_epochs: 500
+  optimizer:
+    lr: 2.0e-4
+  loss:
+    deep_supervision: false   # SegResNetFiLM does not support deep supervision

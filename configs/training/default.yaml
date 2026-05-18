@@ -1,0 +1,42 @@
+# configs/training/default.yaml
+max_epochs:              500
+val_check_interval:      1.0
+gradient_clip_val:       1.0
+accumulate_grad_batches: 2
+precision:               "16-mixed"       # bf16-mixed on Ampere+
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr:           1.0e-4
+  weight_decay: 1.0e-5
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+  T_max:   ${training.max_epochs}
+  eta_min: 1.0e-7
+
+loss:
+  dice_weight:        0.5
+  ce_weight:          0.5
+  focal_weight:       0.0
+  deep_supervision:   true   # set false for models that don't support it
+
+# Sliding window inference
+sw_roi_size:    [128, 128, 128]
+sw_batch_size:  4
+sw_overlap:     0.5
+sw_mode:        gaussian
+
+# Post-processing (applied after ensemble argmax)
+postprocess:
+  min_lesion_volume_ml: 0.05
+  threshold_acute:      0.45
+  threshold_chronic:    0.35
+
+# Early stopping
+patience: 50
+monitor:  val/dice
+mode:     max
+
+# Checkpointing
+save_top_k: 3

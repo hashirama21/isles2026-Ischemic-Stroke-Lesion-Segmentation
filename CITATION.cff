@@ -1,0 +1,73 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "ISLES'26 Ischemic Stroke Lesion Segmentation Pipeline"
+abstract: >
+  Production-grade PyTorch Lightning pipeline for the ISLES'26 Grand
+  Challenge. Implements NNUNet-style DynUNet with FiLM conditioning,
+  deep supervision, weighted lesion sampling, adaptive post-processing,
+  and stratified evaluation for single-modality T1w MRI stroke segmentation
+  across ~2 000 scans from 60+ acquisition centres.
+version: "1.0.0"
+date-released: "2026-01-01"
+license: Apache-2.0
+repository-code: "https://github.com/hashirama21/isles2026-Ischemic-Stroke-Lesion-Segmentation"
+url: "https://github.com/hashirama21/isles2026-Ischemic-Stroke-Lesion-Segmentation"
+keywords:
+  - stroke
+  - lesion segmentation
+  - MRI
+  - deep learning
+  - medical image analysis
+  - nnU-Net
+  - FiLM conditioning
+  - ISLES
+  - Grand Challenge
+authors:
+  - family-names: "Vincess DONGMO"
+    email: "sodiaque806@gmail.com"
+    affiliation: "Independent"
+references:
+  - type: software
+    title: "MONAI: Medical Open Network for AI"
+    url: "https://github.com/Project-MONAI/MONAI"
+  - type: software
+    title: "PyTorch Lightning"
+    url: "https://github.com/Lightning-AI/pytorch-lightning"
+  - type: software
+    title: "TorchIO"
+    url: "https://github.com/fepegar/torchio"
+  - type: article
+    title: "nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation"
+    authors:
+      - family-names: "Isensee"
+        given-names: "Fabian"
+      - family-names: "Jaeger"
+        given-names: "Paul F."
+      - family-names: "Kohl"
+        given-names: "Simon A. A."
+      - family-names: "Petersen"
+        given-names: "Jens"
+      - family-names: "Maier-Hein"
+        given-names: "Klaus H."
+    journal: "Nature Methods"
+    year: 2021
+    volume: 18
+    start: 203
+    end: 211
+    doi: "10.1038/s41592-020-01008-z"
+  - type: article
+    title: "FiLM: Visual Reasoning with a General Conditioning Layer"
+    authors:
+      - family-names: "Perez"
+        given-names: "Ethan"
+      - family-names: "Strub"
+        given-names: "Florian"
+      - family-names: "de Vries"
+        given-names: "Harm"
+      - family-names: "Dumoulin"
+        given-names: "Vincent"
+      - family-names: "Courville"
+        given-names: "Aaron"
+    journal: "AAAI Conference on Artificial Intelligence"
+    year: 2018

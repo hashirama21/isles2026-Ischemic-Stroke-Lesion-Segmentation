@@ -1,0 +1,52 @@
+# Data
+data/raw/
+data/processed/
+data/splits/
+
+# Outputs
+outputs/
+*.ckpt
+*.pth
+*.pt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Hydra
+outputs/
+multirun/
+.hydra/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb~
+
+# Env
+.env
+.venv
+venv/
+env/
+
+# WandB
+wandb/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+*.tar.gz
+
+# OS
+.DS_Store
+Thumbs.db

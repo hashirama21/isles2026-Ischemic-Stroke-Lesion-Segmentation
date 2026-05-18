@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "isles26"
+version = "0.1.0"
+description = "ISLES'26 Ischemic Stroke Lesion Segmentation"
+requires-python = ">=3.10"
+dependencies = [
+    # Core DL
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+    "pytorch-lightning>=2.2.0",
+    # Medical imaging
+    "monai[all]>=1.3.0",
+    "torchio>=0.19.6",
+    "nibabel>=5.2.0",
+    "SimpleITK>=2.3.1",
+    "antspyx>=0.4.2",
+    # Config management
+    "hydra-core>=1.3.2",
+    "omegaconf>=2.3.0",
+    # Experiment tracking
+    "wandb>=0.16.0",
+    # Data / utils
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "scikit-learn>=1.4.0",
+    "scipy>=1.12.0",
+    "tqdm>=4.66.0",
+    "rich>=13.7.0",
+    "einops>=0.7.0",
+    "connected-components-3d>=3.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+    "pre-commit>=3.7.0",
+    "ipykernel>=6.29.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "jupyterlab>=4.1.0",
+]
+mamba = [
+    # Install separately — CUDA-version sensitive
+    # pip install mamba-ssm causal-conv1d
+    "mamba-ssm>=1.2.0",
+    "causal-conv1d>=1.2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-report=term-missing -v"

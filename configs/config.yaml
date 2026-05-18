@@ -1,0 +1,27 @@
+# configs/config.yaml  — root Hydra config
+defaults:
+  - data: isles26
+  - model: nnunet          # NNUNetWrapper (DynUNet + FiLM) — recommended default
+  - training: default
+  - experiment: null        # override everything for a named run
+  - _self_
+
+fold: 0
+seed: 42
+debug: false
+
+paths:
+  root:        ${hydra:runtime.cwd}
+  data_raw:    ${paths.root}/data/raw
+  data_proc:   ${paths.root}/data/processed
+  splits:      ${paths.root}/data/splits
+  outputs:     ${paths.root}/outputs
+  checkpoints: ${paths.outputs}/checkpoints/fold${fold}
+  logs:        ${paths.outputs}/logs
+  predictions: ${paths.outputs}/predictions
+
+wandb:
+  project: isles26
+  entity:  null              # set via env WANDB_ENTITY
+  tags:    ["fold${fold}", "${model._target_}"]
+  mode:    online            # online | offline | disabled

@@ -1,0 +1,29 @@
+# configs/data/isles26.yaml
+_target_: src.data.datamodule.ISLES26DataModule
+
+processed_dir: ${paths.data_proc}
+splits_file:   ${paths.splits}/splits_5fold.json
+fold:          ${fold}
+
+# Spatial
+spatial_size:  [128, 128, 128]
+spacing:       [1.0, 1.0, 1.0]               # resample to isotropic 1 mm
+
+# DataLoader
+train_batch_size: 2
+val_batch_size:   1
+num_workers:      4
+pin_memory:       true
+persistent_workers: true
+
+# Augmentation probabilities / ranges
+augmentation:
+  random_flip_prob:        0.5
+  random_affine_prob:      0.3
+  random_elastic_prob:     0.2
+  random_bias_field_prob:  0.4
+  random_noise_prob:       0.4
+  random_motion_prob:      0.2
+  random_ghosting_prob:    0.2
+  random_spike_prob:       0.15
+  gamma_range:             [0.7, 1.5]

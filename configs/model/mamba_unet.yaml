@@ -1,0 +1,9 @@
+# configs/model/mamba_unet.yaml
+# EXPERIMENTAL — verify CUDA kernel compatibility before Docker submission
+_target_: src.models.mamba_unet.HybridCNNMambaUNet
+
+in_channels:   1
+out_channels:  2
+base_filters:  32
+mamba_depth:   2
+meta_dim:      2
