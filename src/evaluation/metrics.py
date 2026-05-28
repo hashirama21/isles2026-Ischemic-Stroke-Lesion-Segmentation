@@ -63,21 +63,14 @@ def compute_lesion_metrics(
     pred_labels, n_pred = ndimage.label(pred)
     gt_labels, n_gt = ndimage.label(gt)
 
-    tp = 0
-    for gt_id in range(1, n_gt + 1):
-        gt_mask = gt_labels == gt_id
-        overlapping = np.unique(pred_labels[gt_mask])
-        overlapping = overlapping[overlapping > 0]
-        best_iou = 0.0
-        for pred_id in overlapping:
-            pred_mask = pred_labels == pred_id
-            iou = (gt_mask & pred_mask).sum() / (gt_mask | pred_mask).sum()
-            best_iou = max(best_iou, iou)
-        if best_iou >= iou_threshold:
-            tp += 1
+    # Precision and recall need independent TP counts:
+    #   recall    — how many GT lesions were hit by at least one prediction
+    #   precision — how many predicted lesions hit at least one GT lesion
+    tp_recall = _count_detected(gt_labels, pred_labels, n_gt, iou_threshold)
+    tp_precision = _count_detected(pred_labels, gt_labels, n_pred, iou_threshold)
 
-    precision = tp / n_pred if n_pred > 0 else 0.0
-    recall = tp / n_gt if n_gt > 0 else 0.0
+    precision = tp_precision / n_pred if n_pred > 0 else 0.0
+    recall = tp_recall / n_gt if n_gt > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
     metrics["lesion_precision"] = precision
@@ -160,6 +153,27 @@ def stratified_metrics(results_df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Internal helpers
+
+def _count_detected(
+    query_labels: np.ndarray,
+    ref_labels: np.ndarray,
+    n_query: int,
+    iou_threshold: float,
+) -> int:
+    """Count query lesions that have IoU >= iou_threshold with at least one ref lesion."""
+    count = 0
+    for qid in range(1, n_query + 1):
+        q_mask = query_labels == qid
+        candidates = np.unique(ref_labels[q_mask])
+        candidates = candidates[candidates > 0]
+        for rid in candidates:
+            r_mask = ref_labels == rid
+            iou = (q_mask & r_mask).sum() / (q_mask | r_mask).sum()
+            if iou >= iou_threshold:
+                count += 1
+                break
+    return count
+
 
 def _get_surface_points(mask: np.ndarray) -> np.ndarray:
     eroded = ndimage.binary_erosion(mask)

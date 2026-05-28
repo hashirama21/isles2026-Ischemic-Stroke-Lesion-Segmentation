@@ -11,6 +11,8 @@ import torch
 from monai.data import MetaTensor
 from torch.utils.data import Dataset
 
+MAX_DAYS: float = 365.0  # normalization ceiling for days_post_stroke
+
 
 class ISLES26Dataset(Dataset):
     """PyTorch Dataset for ISLES'26.
@@ -22,8 +24,6 @@ class ISLES26Dataset(Dataset):
         subject_id  : str
         center      : str
     """
-
-    MAX_DAYS = 365.0
 
     def __init__(
         self,
@@ -53,7 +53,7 @@ class ISLES26Dataset(Dataset):
         )
 
         days = float(info.get("days_post_stroke", 0.0))
-        days_norm = float(np.clip(days, 0.0, self.MAX_DAYS) / self.MAX_DAYS)
+        days_norm = float(np.clip(days, 0.0, MAX_DAYS) / MAX_DAYS)
         chronicity = float(info.get("chronicity", 0.0))
         metadata = torch.tensor([days_norm, chronicity], dtype=torch.float32)
 

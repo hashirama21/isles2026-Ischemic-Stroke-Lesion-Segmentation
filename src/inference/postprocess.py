@@ -4,6 +4,8 @@ from __future__ import annotations
 import numpy as np
 from scipy import ndimage
 
+from src.data.dataset import MAX_DAYS
+
 
 def remove_small_components(
     pred: np.ndarray,
@@ -12,12 +14,12 @@ def remove_small_components(
     """Remove connected components smaller than min_volume_vox voxels (26-connectivity)."""
     struct = ndimage.generate_binary_structure(3, 3)  # 26-connectivity
     labeled, n = ndimage.label(pred.astype(bool), structure=struct)
-    cleaned = np.zeros_like(pred)
-    for i in range(1, n + 1):
-        mask = labeled == i
-        if mask.sum() >= min_volume_vox:
-            cleaned[mask] = 1
-    return cleaned.astype(pred.dtype)
+    if n == 0:
+        return np.zeros_like(pred)
+    sizes = ndimage.sum(np.ones(labeled.shape, dtype=np.intp), labeled, range(1, n + 1))
+    keep = np.zeros(n + 1, dtype=bool)  # index 0 = background → False
+    keep[1:] = np.array(sizes) >= min_volume_vox
+    return keep[labeled].astype(pred.dtype)
 
 
 def fill_holes(pred: np.ndarray) -> np.ndarray:
@@ -73,7 +75,7 @@ def postprocess_prediction(
     Returns:
         Post-processed binary uint8 mask [D, H, W].
     """
-    days = float(metadata[0]) * 365.0  # de-normalise
+    days = float(metadata[0]) * MAX_DAYS  # de-normalise
 
     lesion_probs = prob_map[1] if prob_map.ndim == 4 else prob_map
     result = adaptive_threshold(

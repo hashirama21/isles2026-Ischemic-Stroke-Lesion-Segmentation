@@ -8,6 +8,8 @@ Usage:
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import hydra
 import pytorch_lightning as pl
 import wandb
@@ -40,8 +42,6 @@ def main(cfg: DictConfig) -> None:
 
     module = ISLES26Module(cfg)
     console.print(f"Model parameters: {sum(p.numel() for p in module.parameters()):,}")
-
-    from pathlib import Path
 
     ckpt_dir = Path(cfg.paths.checkpoints)
     ckpt_dir.mkdir(parents=True, exist_ok=True)

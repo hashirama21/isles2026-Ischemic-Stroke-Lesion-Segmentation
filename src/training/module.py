@@ -1,18 +1,21 @@
 """src/training/module.py — PyTorch Lightning LightningModule for ISLES'26."""
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import torch
 import pytorch_lightning as pl
 from hydra.utils import instantiate
 from monai.inferers import sliding_window_inference
 from monai.metrics import DiceMetric
 from monai.networks.utils import one_hot
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
+from src.data.dataset import MAX_DAYS
 from src.training.losses import StrokeLoss
 from src.evaluation.metrics import compute_lesion_metrics
 
@@ -22,7 +25,7 @@ class ISLES26Module(pl.LightningModule):
 
     def __init__(self, cfg: DictConfig) -> None:
         super().__init__()
-        self.save_hyperparameters(cfg)
+        self.save_hyperparameters(OmegaConf.to_container(cfg, resolve=True))
         self.cfg = cfg
 
         self.model = instantiate(cfg.model)
@@ -58,9 +61,21 @@ class ISLES26Module(pl.LightningModule):
         return output
 
     def _sliding_predictor(self, meta: torch.Tensor):
-        """Build a sliding-window predictor that returns full-res logits."""
+        """Build a sliding-window predictor that returns full-res logits.
+
+        Sliding-window inference processes one subject at a time, so meta must
+        have batch dimension 1; the single subject's metadata is expanded to
+        cover all sw_batch_size patch crops passed to the predictor.
+        """
+        if meta.shape[0] != 1:
+            raise ValueError(
+                "Sliding-window inference requires batch_size=1 per subject; "
+                f"got metadata batch of {meta.shape[0]}. "
+                "Set val_batch_size=1 in the data config."
+            )
         def _predict(x: torch.Tensor) -> torch.Tensor:
-            return self._full_res(self.model(x, meta[:x.shape[0]]))
+            # x: [sw_batch_size, C, d, h, w] — multiple patches from the same subject
+            return self._full_res(self.model(x, meta.expand(x.shape[0], -1)))
         return _predict
 
     @staticmethod
@@ -68,9 +83,23 @@ class ISLES26Module(pl.LightningModule):
         """Extract voxel spacing (mm) from image MetaTensor affine, or default 1 mm."""
         image = batch["image"]
         if hasattr(image, "meta") and "affine" in image.meta:
-            affine = image.meta["affine"][0].numpy()
-            spacing = np.sqrt((affine[:3, :3] ** 2).sum(axis=0))
-            return tuple(float(s) for s in spacing)
+            try:
+                affine = image.meta["affine"][0].cpu().numpy()
+                spacing = np.sqrt((affine[:3, :3] ** 2).sum(axis=0))
+                return tuple(float(s) for s in spacing)
+            except Exception as exc:
+                warnings.warn(
+                    f"Failed to extract voxel spacing from affine ({exc}); "
+                    "falling back to (1.0, 1.0, 1.0) — surface distances and volumes "
+                    "will be in voxel units.",
+                    stacklevel=2,
+                )
+        else:
+            warnings.warn(
+                "Image has no affine metadata; falling back to voxel spacing (1.0, 1.0, 1.0). "
+                "Surface distances and volumes will be in voxel units.",
+                stacklevel=2,
+            )
         return (1.0, 1.0, 1.0)
 
     # Forward
@@ -140,7 +169,7 @@ class ISLES26Module(pl.LightningModule):
         )
 
         meta_vals = meta[0].cpu().numpy()
-        days = float(meta_vals[0]) * 365.0
+        days = float(meta_vals[0]) * MAX_DAYS
         metrics["days_post_stroke"] = days
         metrics["chronicity"] = float(meta_vals[1])
         metrics["lesion_volume_ml"] = (
@@ -154,8 +183,6 @@ class ISLES26Module(pl.LightningModule):
         self._test_outputs.append(metrics)
 
     def on_test_epoch_end(self) -> None:
-        import pandas as pd
-
         df = pd.DataFrame(self._test_outputs)
         self._test_outputs.clear()
 

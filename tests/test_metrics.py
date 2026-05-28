@@ -68,6 +68,25 @@ class TestLesionF1:
         assert m["lesion_precision"] < 1.0
         assert m["lesion_recall"] == pytest.approx(1.0, abs=0.01)
 
+    def test_one_pred_covers_multiple_gt_precision_bounded(self):
+        """Precision must stay <= 1 when a single large prediction overlaps multiple GT lesions.
+
+        The old implementation reused the recall TP count for precision, producing
+        precision = n_detected_gt / n_pred which can exceed 1.
+        """
+        shape = (64, 64, 64)
+        # Two separate small GT lesions (centers 16 voxels apart, radii 5 — no overlap)
+        gt = _sphere(shape, (24, 32, 32), 5) | _sphere(shape, (40, 32, 32), 5)
+        # One large prediction that covers both GT lesions
+        pred = _sphere(shape, (32, 32, 32), 12)
+        m = compute_lesion_metrics(pred, gt, iou_threshold=0.01)
+        assert 0.0 <= m["lesion_precision"] <= 1.0
+        assert m["n_pred_lesions"] == pytest.approx(1.0)
+        assert m["n_gt_lesions"] == pytest.approx(2.0)
+        # The single prediction covers both GT lesions → precision=1, recall=1
+        assert m["lesion_precision"] == pytest.approx(1.0, abs=0.01)
+        assert m["lesion_recall"] == pytest.approx(1.0, abs=0.01)
+
 
 # Volume
 
