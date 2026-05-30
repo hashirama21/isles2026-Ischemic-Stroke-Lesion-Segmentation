@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
 
 
 def seed_everything(seed: int) -> None:
@@ -21,15 +22,33 @@ def seed_everything(seed: int) -> None:
 
 def load_checkpoint(
     ckpt_path: Path,
-    model_cfg,
+    model_cfg=None,
     device: torch.device | None = None,
 ) -> torch.nn.Module:
-    """Instantiate a model from config and load weights from checkpoint."""
+    """Instantiate a model and load weights from a Lightning checkpoint.
+
+    If model_cfg is None, the model config is read from the checkpoint's
+    saved hyperparameters (the 'model' key under 'hyper_parameters').
+    Pass model_cfg explicitly only when the checkpoint predates
+    save_hyperparameters or to override the saved architecture.
+    """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # weights_only=False required: Lightning checkpoints contain Python objects
+    # (callbacks, hparams, etc.) beyond plain tensors.
+    state = torch.load(ckpt_path, map_location=device, weights_only=False)
+
+    if model_cfg is None:
+        hparams = state.get("hyper_parameters", {})
+        if "model" not in hparams:
+            raise ValueError(
+                f"Checkpoint {ckpt_path} has no saved 'model' hyperparameters. "
+                "Pass model_cfg explicitly."
+            )
+        model_cfg = OmegaConf.create(hparams["model"])
+
     model = instantiate(model_cfg)
-    state = torch.load(ckpt_path, map_location=device)
 
     # Lightning checkpoints nest weights under 'state_dict'
     if "state_dict" in state:

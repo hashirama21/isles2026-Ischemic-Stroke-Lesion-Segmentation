@@ -72,8 +72,10 @@ class SwinUNETRWrapper(nn.Module):
             logits [B, out_channels, D, H, W]
         """
         self._current_metadata = metadata
-        logits = self.backbone(image)
-        self._current_metadata = None
+        try:
+            logits = self.backbone(image)
+        finally:
+            self._current_metadata = None
         return logits
 
     def __del__(self) -> None:

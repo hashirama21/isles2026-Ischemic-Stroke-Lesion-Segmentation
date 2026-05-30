@@ -23,6 +23,7 @@ from omegaconf import DictConfig
 from rich.console import Console
 from rich.progress import Progress
 
+from src.data.dataset import MAX_DAYS
 from src.data.transforms import get_val_transforms
 from src.inference.predict import ensemble_predict
 from src.utils.misc import seed_everything
@@ -73,17 +74,14 @@ def main(cfg: DictConfig) -> None:
 
             meta_tensor = torch.tensor(
                 [
-                    min(float(meta.get("days_post_stroke", 0)) / 365.0, 1.0),
+                    min(float(meta.get("days_post_stroke", 0)) / MAX_DAYS, 1.0),
                     float(meta.get("chronicity", 0)),
                 ],
                 dtype=torch.float32,
             ).unsqueeze(0)  # [1, 2]
 
-            model_cfgs = [cfg.model] * len(ckpt_paths)
-
             pred_array = ensemble_predict(
                 checkpoint_paths=ckpt_paths,
-                model_cfgs=model_cfgs,
                 image=image_tensor,
                 metadata=meta_tensor,
                 roi_size=roi_size,

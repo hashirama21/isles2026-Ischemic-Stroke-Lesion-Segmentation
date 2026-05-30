@@ -22,6 +22,13 @@ _TTA_FLIPS = [
 ]
 
 
+def _make_predictor(model: torch.nn.Module, metadata: torch.Tensor):
+    """Return a sliding-window predictor that broadcasts metadata to patch batch size."""
+    def _predict(x: torch.Tensor) -> torch.Tensor:
+        return model(x, metadata.expand(x.shape[0], -1))
+    return _predict
+
+
 def predict_with_tta(
     model: torch.nn.Module,
     image: torch.Tensor,
@@ -40,17 +47,18 @@ def predict_with_tta(
 
     image = image.to(device)
     metadata = metadata.to(device)
+    predictor = _make_predictor(model, metadata)
     accumulated: torch.Tensor | None = None
 
     for flip_dims in _TTA_FLIPS:
-        img_flip = torch.flip(image, flip_dims) if flip_dims else image
+        img_flip = torch.flip(image, flip_dims)   # no-op when flip_dims=[]
 
         with torch.no_grad():
             logits = sliding_window_inference(
                 inputs=img_flip,
                 roi_size=roi_size,
                 sw_batch_size=sw_batch_size,
-                predictor=lambda x: model(x, metadata[:x.shape[0]]),
+                predictor=predictor,
                 overlap=overlap,
                 mode="gaussian",
             )
@@ -66,7 +74,6 @@ def predict_with_tta(
 
 def ensemble_predict(
     checkpoint_paths: list[Path],
-    model_cfgs: list,
     image: torch.Tensor,
     metadata: torch.Tensor,
     roi_size: list[int],
@@ -77,9 +84,11 @@ def ensemble_predict(
 ) -> np.ndarray:
     """Load multiple checkpoints and return a binary segmentation mask.
 
+    The model architecture is read from each checkpoint's saved hyperparameters,
+    so folds trained with different architectures are handled automatically.
+
     Args:
         checkpoint_paths:  .ckpt files (one per fold or architecture).
-        model_cfgs:        Hydra model configs matching each checkpoint.
         image:             [1, 1, D, H, W] float tensor.
         metadata:          [1, meta_dim] float tensor.
         roi_size:          Sliding window patch size.
@@ -95,8 +104,8 @@ def ensemble_predict(
 
     all_probs: list[torch.Tensor] = []
 
-    for ckpt_path, model_cfg in zip(checkpoint_paths, model_cfgs):
-        model = load_checkpoint(ckpt_path, model_cfg, device=device)
+    for ckpt_path in checkpoint_paths:
+        model = load_checkpoint(ckpt_path, device=device)  # reads arch from checkpoint
         model.eval()
 
         if use_tta:
@@ -104,12 +113,13 @@ def ensemble_predict(
                 model, image, metadata, roi_size, device=device
             )
         else:
+            meta_dev = metadata.to(device)
             with torch.no_grad():
                 logits = sliding_window_inference(
                     inputs=image.to(device),
                     roi_size=roi_size,
                     sw_batch_size=4,
-                    predictor=lambda x: model(x, metadata.to(device)[:x.shape[0]]),
+                    predictor=_make_predictor(model, meta_dev),
                     overlap=0.5,
                     mode="gaussian",
                 )

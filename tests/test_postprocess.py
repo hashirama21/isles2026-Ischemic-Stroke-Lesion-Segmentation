@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from src.data.dataset import MAX_DAYS
 from src.inference.postprocess import (
     adaptive_threshold,
     fill_holes,
@@ -82,7 +83,7 @@ class TestPostprocessPrediction:
         prob_map[1, 8:14, 8:14, 8:14] = 0.5  # larger region
 
         pred = prob_map.argmax(axis=0).astype(np.uint8)
-        meta = np.array([30.0 / 365.0, 1.0])  # 30 days, subacute
+        meta = np.array([30.0 / MAX_DAYS, 1.0])  # 30 days, subacute
 
         result = postprocess_prediction(
             pred, prob_map, meta, (1.0, 1.0, 1.0), self._Cfg()

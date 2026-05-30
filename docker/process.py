@@ -21,6 +21,8 @@ import SimpleITK as sitk
 import torch
 from omegaconf import OmegaConf
 
+from src.data.dataset import MAX_DAYS
+
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/input"))
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/output"))
 CKPT_DIR = Path("/opt/ml/checkpoints")
@@ -29,18 +31,39 @@ IMAGE_INPUT = INPUT_DIR / "images" / "t1-brain-mri"
 META_INPUT = INPUT_DIR / "metadata.json"
 SEG_OUTPUT = OUTPUT_DIR / "images" / "stroke-lesion-segmentation"
 
-# Hydra-compatible model config so load_checkpoint can call instantiate()
-_MODEL_CFG = OmegaConf.create({
-    "_target_": "src.models.segresnet.SegResNetFiLM",
-    "in_channels": 1,
-    "out_channels": 2,
-    "init_filters": 32,
-    "blocks_down": [1, 2, 2, 4],
-    "blocks_up": [1, 1, 1],
-    "dropout_prob": 0.2,
-    "meta_dim": 2,
-    "film_hidden_dim": 64,
-})
+
+def _sitk_to_ras_affine(img_sitk: sitk.Image) -> np.ndarray:
+    """Build a RAS-convention NIfTI affine from a SimpleITK image.
+
+    SimpleITK uses LPS orientation with (x, y, z) physical/index convention.
+    GetArrayFromImage returns a numpy array in (z, y, x) order.
+    NIfTI/MONAI use RAS orientation.
+
+    Steps:
+        1. Build LPS affine for (x, y, z) voxel indexing.
+        2. Negate x and y rows to convert LPS → RAS.
+        3. Permute affine columns so that numpy (z, y, x) indices
+           map to the correct RAS physical coordinates.
+    """
+    spacing = np.array(img_sitk.GetSpacing())                         # (sx, sy, sz)
+    origin = np.array(img_sitk.GetOrigin())                           # (ox, oy, oz) LPS
+    direction = np.array(img_sitk.GetDirection()).reshape(3, 3)       # LPS (x,y,z)
+
+    affine_lps = np.eye(4, dtype=np.float64)
+    affine_lps[:3, :3] = direction @ np.diag(spacing)
+    affine_lps[:3, 3] = origin
+
+    # LPS → RAS: negate first two physical axis rows (L→R, P→A)
+    affine_ras = affine_lps.copy()
+    affine_ras[[0, 1], :] *= -1
+
+    # Permute columns: numpy array is (z, y, x) but affine was built for (x, y, z)
+    # The permutation matrix maps numpy index (nz, ny, nx) → physical (x, y, z) order
+    perm = np.array([[0, 0, 1, 0],
+                     [0, 1, 0, 0],
+                     [1, 0, 0, 0],
+                     [0, 0, 0, 1]], dtype=np.float64)
+    return (affine_ras @ perm).astype(np.float32)
 
 
 def load_input_image() -> tuple[np.ndarray, np.ndarray]:
@@ -50,15 +73,8 @@ def load_input_image() -> tuple[np.ndarray, np.ndarray]:
         raise FileNotFoundError(f"No image found in {IMAGE_INPUT}")
 
     img_sitk = sitk.ReadImage(str(files[0]))
-    # GetArrayFromImage returns (z, y, x); spacing/direction are in (x, y, z)
-    data = sitk.GetArrayFromImage(img_sitk).astype(np.float32)  # [D, H, W]
-    spacing = np.array(img_sitk.GetSpacing()[::-1])             # flip to (z, y, x)
-    origin = np.array(img_sitk.GetOrigin()[::-1])
-    direction = np.array(img_sitk.GetDirection()).reshape(3, 3)[::-1, ::-1]
-
-    affine = np.eye(4)
-    affine[:3, :3] = direction @ np.diag(spacing)
-    affine[:3, 3] = origin
+    data = sitk.GetArrayFromImage(img_sitk).astype(np.float32)  # [D, H, W] = (z,y,x)
+    affine = _sitk_to_ras_affine(img_sitk)
 
     return data, affine
 
@@ -93,15 +109,13 @@ def run() -> None:
     days = float(raw_meta.get("DAYS_POST_STROKE", 0))
     chronicity = float(raw_meta.get("CHRONICITY", 0))
     meta_tensor = torch.tensor(
-        [min(days / 365.0, 1.0), chronicity], dtype=torch.float32
+        [min(days / MAX_DAYS, 1.0), chronicity], dtype=torch.float32
     ).unsqueeze(0)  # [1, 2]
 
     ckpt_paths = sorted(CKPT_DIR.glob("*.ckpt"))
     if not ckpt_paths:
         raise FileNotFoundError(f"No checkpoints found in {CKPT_DIR}")
     print(f"[process.py] {len(ckpt_paths)} checkpoints found")
-
-    from omegaconf import OmegaConf
 
     from src.inference.predict import ensemble_predict
 
@@ -112,11 +126,9 @@ def run() -> None:
             "threshold_chronic": 0.35,
         }
     })
-    model_cfgs = [_MODEL_CFG] * len(ckpt_paths)
 
     pred = ensemble_predict(
         checkpoint_paths=ckpt_paths,
-        model_cfgs=model_cfgs,
         image=image_tensor,
         metadata=meta_tensor,
         roi_size=[128, 128, 128],

@@ -28,9 +28,12 @@ class StrokeLoss(nn.Module):
         deep_supervision: bool = False,
     ) -> None:
         super().__init__()
-        assert abs(dice_weight + ce_weight + focal_weight - 1.0) < 1e-3, (
-            "Loss weights must sum to 1.0"
-        )
+        total = dice_weight + ce_weight + focal_weight
+        if abs(total - 1.0) >= 1e-3:
+            raise ValueError(
+                f"Loss weights must sum to 1.0; got "
+                f"dice={dice_weight} + ce={ce_weight} + focal={focal_weight} = {total:.6f}"
+            )
         self.dice_weight = dice_weight
         self.ce_weight = ce_weight
         self.focal_weight = focal_weight

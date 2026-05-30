@@ -46,19 +46,22 @@ def main(cfg: DictConfig) -> None:
     ckpt_dir = Path(cfg.paths.checkpoints)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
+    monitor = cfg.training.monitor
+    ckpt_mode = cfg.training.mode
+
     callbacks = [
         ModelCheckpoint(
             dirpath=ckpt_dir,
-            filename="epoch{epoch:03d}-dice{val/dice:.4f}",
-            monitor="val/dice",
-            mode="max",
+            filename=f"epoch{{epoch:03d}}-{monitor.replace('/', '_')}{{val/dice:.4f}}",
+            monitor=monitor,
+            mode=ckpt_mode,
             save_top_k=cfg.training.save_top_k,
             auto_insert_metric_name=False,
         ),
         EarlyStopping(
-            monitor="val/dice",
+            monitor=monitor,
             patience=cfg.training.patience,
-            mode="max",
+            mode=ckpt_mode,
             verbose=True,
         ),
         LearningRateMonitor(logging_interval="epoch"),

@@ -83,8 +83,10 @@ class NNUNetWrapper(nn.Module):
             Otherwise                   : [B, out_channels, D, H, W]
         """
         self._current_metadata = metadata
-        output = self.backbone(image)
-        self._current_metadata = None
+        try:
+            output = self.backbone(image)
+        finally:
+            self._current_metadata = None
 
         # DynUNet stacks deep supervision outputs: [B, N, C, D, H, W]
         # Return only full-resolution during eval / inference
